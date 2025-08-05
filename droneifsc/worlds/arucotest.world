@@ -1,0 +1,41 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="arena_FRL">
+    
+    <!-- ARUCO BASE -->
+    <model name="aruco_base">
+      <include>
+	      <uri>model://aruco_base</uri>
+      </include>
+      <pose>3 3 0 0 0 1.5708</pose>
+    </model>
+
+    <!-- Adiciona o chão -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Luz ambiente -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- Iris UAV -->
+    <model name="droneIFSC">
+      <include>
+        <uri>model://droneIFSC</uri>  
+      </include>
+      <pose>0 0 0.1 0 0 1.57</pose>  
+    </model>
+
+    <!-- QRCode Box -->
+    <model name="qr_cube">
+      <include>
+        <uri>model://qr_cube</uri>
+      </include>
+      <pose>-4 7.5 1.52 0 0 -1.5708</pose>
+    </model>
+  </world>
+</sdf>
+
+ 

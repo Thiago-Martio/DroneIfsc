@@ -1,0 +1,38 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="base_pouso">
+    <static>true</static>
+    <link name="link_base">  	
+
+      <!-- Plano de 1x1m (contorno) -->
+      <visual name="borda">
+        <geometry>
+          <box><size>0.5 0.5 0.01</size></box>
+        </geometry>
+        <material>
+          <ambient>1 1 0 1</ambient>  <!-- Amarelo -->
+          <diffuse>1 1 0 1</diffuse>
+        </material>
+      </visual>
+
+
+      <visual name="aruco">
+        <geometry>
+          <box>
+            <size>0.18 0.18 0.005</size>
+          </box>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://aruco_base/materials/scripts</uri>
+            <uri>model://aruco_base/materials/textures</uri>
+            <name>Aruco/Image</name>
+          </script>
+        </material>
+        <pose>0 0 0.005</pose>
+      </visual>
+
+
+    </link>
+  </model>
+</sdf>
