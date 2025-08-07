@@ -66,7 +66,7 @@ class CameraHandler:
         self.image_topic = rospy.get_param('~image_topic', '/camera/image_raw')
         self.camera_info_topic = rospy.get_param('~camera_info_topic', '/camera/camera_info')
         self.frame_id = rospy.get_param('~frame_id', 'camera_frame')
-        self.ost_file = rospy.get_param('~ost_file', '/home/thiago/catkin_ws/src/droneifsc/scripts/ost.yaml')  # Path to the camera calibration file
+        self.ost_file = rospy.get_param('~ost_file', '/root/precision_ws/src/DroneIfsc/droneifsc/scripts/ost.yaml')  # Path to the camera calibration file
         
         # Initialize camera capture
         rospy.loginfo("Initializing camera...")
@@ -85,7 +85,7 @@ class CameraHandler:
         rospy.loginfo("Camera Handler initialized with topics: %s and %s", self.image_topic, self.camera_info_topic)
         while not rospy.is_shutdown():
             self.publish_camera_data()
-            time.sleep(0.1)  # Adjust the sleep time as needed
+            time.sleep(0.033)  # Adjust the sleep time as needed
     def publish_camera_data(self):
         # Simulate capturing an image (replace with actual camera capture code)
         try:
