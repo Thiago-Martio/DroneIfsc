@@ -35,7 +35,7 @@ def calculate_3d_distance_numpy(x, y, z):
     return distance
 
 
-connection_string = rospy.get_param('~connection_string', '/dev/ttyS0')  # Default connection string, adjust as needed
+connection_string = rospy.get_param('~connection_string', '/dev/ttyAMA0')  # Default connection string, adjust as needed
 target_num = 0  # ID do alvo
 target_type = mavutil.mavlink.LANDING_TARGET_TYPE_VISION_FIDUCIAL
 frame = mavutil.mavlink.MAV_FRAME_BODY_FRD  # ou LOCAL_NED se preferir

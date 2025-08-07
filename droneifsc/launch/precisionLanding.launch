@@ -17,7 +17,7 @@
     </node>
 
     <!-- Nó pose_MAV_sender.py -->
-	<arg name="connection_string" default="/dev/ttyS0"/><!-- udp:127.0.0.1:14550 for gazebo -->
+	<arg name="connection_string" default="/dev/ttyAMA0"/><!-- udp:127.0.0.1:14550 for gazebo -->
     
     <node pkg="droneifsc" type="pose_MAV_sender.py" name="pose_mav_sender" output="screen">
 		<!--potencial problema aqui, qualquer coisa so hardcodar no codigo--><param name="connection_string" value="$(arg connection_string)"/> <!-- Default connection string, adjust as needed -->
