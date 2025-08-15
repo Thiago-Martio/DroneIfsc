@@ -25,13 +25,13 @@ class NavigatorNode:
             rospy.signal_shutdown("Failed to set MAV_FRAME.")
 
         # Parameters
-        self.desired_altitude = rospy.get_param('~desired_altitude', 3.0)  # Altitude in meters
+        self.desired_altitude = rospy.get_param('~desired_altitude', 1.5)  # Altitude in meters
         self.flying = False
         self.current_pose = PoseStamped()
         self.last_detection_pose = PoseStamped()
         self.is_detection_consistent = False
-        self.desired_x = rospy.get_param('~desired_x', 0.0)
-        self.desired_y = rospy.get_param('~desired_y', 0.0)
+        self.desired_x = rospy.get_param('~desired_x', 1.0)
+        self.desired_y = rospy.get_param('~desired_y', 1.0)
         self.desired_z = rospy.get_param('~desired_z', 0.0)
 
         # Configuração do tópico (ajuste conforme seu setup)
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     navigator_node = NavigatorNode()
     try:
         rospy.loginfo("Arming and taking off...")
-        #navigator_node.arm_and_takeoff()
+        navigator_node.arm_and_takeoff()
         navigator_node.goto_desired_position(navigator_node.desired_x, navigator_node.desired_y, navigator_node.desired_z)  # Pass None or a specific position if needed
         navigator_node.seek_for_consistency_and_land()  # Ensure detection consistency
         rospy.spin()
