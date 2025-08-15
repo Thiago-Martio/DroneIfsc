@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import rospy
 from aruco_opencv_msgs.msg import ArucoDetection
 from geometry_msgs.msg import PoseStamped
@@ -34,7 +34,7 @@ def calculate_3d_distance_numpy(x, y, z):
     return distance
 
 
-connection_string = rospy.get_param('connection_string')  # ou '/dev/ttyAMA0'
+connection_string = 'udp:127.0.0.1:14550'  # ou '/dev/ttyAMA0'
 target_num = 0  # ID do alvo
 target_type = mavutil.mavlink.LANDING_TARGET_TYPE_VISION_FIDUCIAL
 frame = mavutil.mavlink.MAV_FRAME_BODY_FRD  # ou LOCAL_NED se preferir

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import rospy
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
@@ -148,7 +149,7 @@ class NavigatorNode:
         Continuously check for detection consistency and update the last detected pose.
         """
         rospy.sleep(2)
-        while not self.is_detection_consistent:
+        while not self.is_detection_consistent and not rospy.is_shutdown():
             rospy.loginfo("Seeking for detection consistency...")
             self.goto_desired_position(self.last_detection_pose.pose.position.x, self.last_detection_pose.pose.position.y, 0)  # Stay at current position
             rospy.sleep(2.0)  # Adjust the sleep time as needed
@@ -158,9 +159,6 @@ class NavigatorNode:
         """
         Land the vehicle safely.
         """
-        if not self.flying:
-            rospy.logwarn("Vehicle is not flying. Cannot land.")
-            return
         
         set_mode_service = rospy.ServiceProxy('/mavros/set_mode', mavros_srv.SetMode)
         try:
@@ -190,12 +188,16 @@ class NavigatorNode:
         self.last_detection_pose = msg
         rospy.loginfo(f"Last detected pose updated: {self.last_detection_pose.pose.position.x}, {self.last_detection_pose.pose.position.y}, {self.last_detection_pose.pose.position.z}")
 if __name__ == '__main__':
+    navigator_node = NavigatorNode()
     try:
-        navigator_node = NavigatorNode()
         rospy.loginfo("Arming and taking off...")
-        navigator_node.arm_and_takeoff()
+        #navigator_node.arm_and_takeoff()
         navigator_node.goto_desired_position(navigator_node.desired_x, navigator_node.desired_y, navigator_node.desired_z)  # Pass None or a specific position if needed
         navigator_node.seek_for_consistency_and_land()  # Ensure detection consistency
         rospy.spin()
     except rospy.ROSInterruptException:
-        pass
+        navigator_node.land()
+    finally:  # Garante que land()
+        if navigator_node.flying:
+            navigator_node.land()
+        rospy.loginfo("Node shutdown")

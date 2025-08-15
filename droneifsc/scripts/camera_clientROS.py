@@ -93,7 +93,7 @@ class CameraHandler:
             if img is None:
                 rospy.logwarn("No image captured from camera.")
                 return
-
+            #rotimg = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
             # Convert OpenCV image to ROS Image message
             ros_image = self.bridge.cv2_to_imgmsg(img, encoding="bgr8")
             ros_image.header.stamp = rospy.Time.now()
