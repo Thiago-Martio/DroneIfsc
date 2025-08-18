@@ -2,6 +2,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
+from mavros_msgs.msg import VFR_HUD
 import numpy as np
 
 import mavros_msgs.srv as mavros_srv
@@ -25,7 +26,7 @@ class NavigatorNode:
             rospy.signal_shutdown("Failed to set MAV_FRAME.")
 
         # Parameters
-        self.desired_altitude = rospy.get_param('~desired_altitude', 1.5)  # Altitude in meters
+        self.desired_altitude =  2.0  # Altitude in meters
         self.flying = False
         self.current_pose = PoseStamped()
         self.last_detection_pose = PoseStamped()
@@ -33,19 +34,22 @@ class NavigatorNode:
         self.desired_x = rospy.get_param('~desired_x', 1.0)
         self.desired_y = rospy.get_param('~desired_y', 1.0)
         self.desired_z = rospy.get_param('~desired_z', 0.0)
-
+        self.ahrsz = 0
         # Configuração do tópico (ajuste conforme seu setup)
-        drone_pose_topic = "/mavros/local_position/pose"
+        drone_pose_topic = "/mavros/global_position/pose"
         setpoint_local_topic = "/mavros/setpoint_position/local"  # Tópico padrão para sua simulação
         consistency_topic = "/aruco_detection_consistency" 
         last_pose_topic = "/last_aruco_pose"
+        vfr_data_topic = "/mavros/vfr_hud"
         # Subscribers
         rospy.Subscriber(drone_pose_topic, PoseStamped, self.drone_pose_callback)
         rospy.Subscriber(consistency_topic, Bool, self.detection_consistency_callback)
         rospy.Subscriber(last_pose_topic, PoseStamped, self.last_pose_callback)
-        # Publishers
+        rospy.Subscriber(vfr_data_topic, VFR_HUD, self.vfr_callback) 
+	# Publishers
         self.pose_sender = rospy.Publisher(setpoint_local_topic, PoseStamped, queue_size=10)
         
+        rospy.sleep(3)
 
     def arm_and_takeoff(self):
         vehicle_info_service = rospy.ServiceProxy('/mavros/vehicle_info_get', mavros_srv.VehicleInfoGet)
@@ -76,8 +80,11 @@ class NavigatorNode:
             if takeoff_response.success:
                 rospy.loginfo("Takeoff command sent successfully.")
                 self.flying = True
-                while self.current_pose.pose.position.z + self.desired_altitude*0.1 <= self.desired_altitude:
-                    rospy.loginfo(f"Current altitude: {self.current_pose.pose.position.z}m, waiting to reach {self.desired_altitude}m")
+                real_desired_altitude = self.ahrsz + self.desired_altitude
+                rospy.loginfo(f"desired {real_desired_altitude}")
+                rospy.loginfo(self.ahrsz) 
+                while self.ahrsz + real_desired_altitude*0.01 <= real_desired_altitude and not rospy.is_shutdown():
+                    rospy.loginfo(f"Current altitude: {self.ahrsz}m, waiting to reach {self.desired_altitude}m")
                     rospy.sleep(0.1)
                 rospy.loginfo(f"Reached desired altitude: {self.desired_altitude}m")
             else:
@@ -95,8 +102,12 @@ class NavigatorNode:
             [self.current_pose.pose.position.y],
             [self.current_pose.pose.position.z]
         ])
+        desired_position = np.array([
+            [self.current_pose.pose.position.x + dx],
+            [self.current_pose.pose.position.y + dy],
+            [self.current_pose.pose.position.z + dz]
+        ])
         start_time = rospy.Time.now()
-        last_position = start_position
         last_change_time = start_time
         
         # Publicar comando
@@ -108,9 +119,13 @@ class NavigatorNode:
         self.pose_sender.publish(position_stamped)
         
         # Calcular distância esperada
-        expected_distance = np.linalg.norm([dx, dy, dz])
-        
-        while not rospy.is_shutdown():
+        #expected_distance = np.linalg.norm([dx, dy, dz])
+        current_position = np.array([
+            [self.current_pose.pose.position.x],
+            [self.current_pose.pose.position.y],
+            [self.current_pose.pose.position.z]
+        ])
+        while not rospy.is_shutdown() and abs(np.linalg.norm(desired_position) - np.linalg.norm(current_position) > 0.3):
             current_position = np.array([
                 [self.current_pose.pose.position.x],
                 [self.current_pose.pose.position.y],
@@ -118,31 +133,26 @@ class NavigatorNode:
             ])
             
             # Calcular progresso
-            displacement = current_position - start_position
-            distance_traveled = np.linalg.norm(displacement)
-            progress = distance_traveled / expected_distance
-            
-            # Verificar se chegou
-            if distance_traveled >= expected_distance - tolerance:
-                rospy.loginfo(f"Reached destination. Traveled: {distance_traveled:.2f}m")
-                return True
+            #displacement = current_position - start_position
+            #distance_traveled = np.linalg.norm(displacement)
+            #progress = distance_traveled / expected_distance
             
             # Verificar estagnação
-            position_change = np.linalg.norm(current_position - last_position)
-            if position_change < tolerance/2:
-                if (rospy.Time.now() - last_change_time).to_sec() > 2.0:
-                    rospy.logwarn(f"Stagnated at {distance_traveled:.2f}m from start")
-                    return False
-            else:
-                last_position = current_position
-                last_change_time = rospy.Time.now()
+            #position_change = np.linalg.norm(current_position - last_position)
+            #if position_change < tolerance/2:
+                #if (rospy.Time.now() - last_change_time).to_sec() > 2.0:
+                    #rospy.logwarn(f"Stagnated at {distance_traveled:.2f}m from start")
+                    #return False
+            #else:
+            last_position = current_position
+            last_change_time = rospy.Time.now()
             
             # Verificar timeout
-            if (rospy.Time.now() - start_time).to_sec() > timeout:
-                rospy.logwarn(f"Timeout after {timeout} seconds. Traveled: {distance_traveled:.2f}m")
-                return False
+            #if (rospy.Time.now() - start_time).to_sec() > timeout:
+             #   rospy.logwarn(f"Timeout after {timeout} seconds. Traveled: {distance_traveled:.2f}m")
+              #  return False
                 
-            rospy.loginfo(f"Progress: {progress*100:.1f}% ({distance_traveled:.2f}m/{expected_distance:.2f}m)")
+            #rospy.loginfo(f"Progress: {progress*100:.1f}% ({distance_traveled:.2f}m/{expected_distance:.2f}m)")
             rospy.sleep(0.2)
     def seek_for_consistency_and_land(self):
         """
@@ -187,13 +197,17 @@ class NavigatorNode:
         """
         self.last_detection_pose = msg
         rospy.loginfo(f"Last detected pose updated: {self.last_detection_pose.pose.position.x}, {self.last_detection_pose.pose.position.y}, {self.last_detection_pose.pose.position.z}")
+    def vfr_callback(self, msg):
+        self.ahrsz = msg.altitude
 if __name__ == '__main__':
     navigator_node = NavigatorNode()
     try:
         rospy.loginfo("Arming and taking off...")
         navigator_node.arm_and_takeoff()
-        navigator_node.goto_desired_position(navigator_node.desired_x, navigator_node.desired_y, navigator_node.desired_z)  # Pass None or a specific position if needed
-        navigator_node.seek_for_consistency_and_land()  # Ensure detection consistency
+        navigator_node.goto_desired_position(0, 1, 0)  # Pass None or a specific position if needed
+        #navigator_node.goto_desired_position(0, -1, 0)
+        navigator_node.land()
+        #navigator_node.seek_for_consistency_and_land()  # Ensure detection consistency
         rospy.spin()
     except rospy.ROSInterruptException:
         navigator_node.land()
