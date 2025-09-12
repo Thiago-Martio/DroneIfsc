@@ -5,6 +5,7 @@ from sensor_msgs.msg import CameraInfo
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 import yaml
+import time
 
 class CameraHandler:
     def __init__(self):
@@ -62,8 +63,10 @@ class CameraHandler:
         secs = int(sensor_ts_epoch)
         nsecs = int((sensor_ts_epoch - secs) * 1e9)
         stamp = rospy.Time(secs, nsecs)
+        #cvt to grayscale
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         try:
-            ros_image = self.bridge.cv2_to_imgmsg(img, encoding="mono8") 
+            ros_image = self.bridge.cv2_to_imgmsg(gray, encoding="mono8") 
             ros_image.header.stamp = stamp
             ros_image.header.frame_id = self.frame_id
             # Publish
