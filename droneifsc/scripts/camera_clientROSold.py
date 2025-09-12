@@ -5,22 +5,72 @@ from sensor_msgs.msg import CameraInfo
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 import yaml
+import numpy as np
+import requests
+from threading import Thread
+import time
+
+class FlaskCamera:
+    def __init__(self, host_ip, port=8080):
+        self.host_ip = host_ip
+        self.port = port
+        self.stream_url = f"http://{host_ip}:{port}/stream"
+        self.snapshot_url = f"http://{host_ip}:{port}/snapshot"
+        self.frame = None
+        self.stopped = False
+        
+    def start_stream(self):
+        Thread(target=self.update_frame, args=()).start()
+        return self
+    
+    def update_frame(self):
+        # Stream approach for continuous video
+        stream = requests.get(self.stream_url, stream=True)
+        bytes_data = bytes()
+        
+        for chunk in stream.iter_content(chunk_size=1024):
+            if self.stopped:
+                stream.close()
+                return
+                
+            bytes_data += chunk
+            a = bytes_data.find(b'\xff\xd8')  # JPEG start
+            b = bytes_data.find(b'\xff\xd9')  # JPEG end
+            
+            if a != -1 and b != -1:
+                jpg = bytes_data[a:b+2]
+                bytes_data = bytes_data[b+2:]
+                
+                # Convert to OpenCV image
+                self.frame = cv2.imdecode(
+                    np.frombuffer(jpg, dtype=np.uint8), 
+                    cv2.IMREAD_COLOR
+                )
+    
+    def get_frame(self):
+        # Snapshot approach for single images
+        response = requests.get(self.snapshot_url)
+        return cv2.imdecode(
+            np.frombuffer(response.content, np.uint8),
+            cv2.IMREAD_COLOR
+        )
+    
+    def stop(self):
+        self.stopped = True
 
 class CameraHandler:
     def __init__(self):
         rospy.init_node('camera_handler')
-
-        boot_ts = time.clock_gettime(time.CLOCK_BOOTTIME)
-        epoch_ts = time.clock_gettime(time.CLOCK_REALTIME)
-        self.boot_epoch_offset = epoch_ts - boot_ts  # em segundos
+        
         # Parameters
-        self.image_topic = '/camera/image_raw'
-        self.camera_info_topic = '/camera/camera_info'
-        self.frame_id = 'camera_frame'
-        self.ost_file = 'ost.yaml'  # Path to the camera calibration file
-        self.shm_path = '/dev/shm/rpicam/cam.mjpeg'  # <-- arquivo no /dev/shm
+        self.image_topic = rospy.get_param('~image_topic', '/camera/image_raw')
+        self.camera_info_topic = rospy.get_param('~camera_info_topic', '/camera/camera_info')
+        self.frame_id = rospy.get_param('~frame_id', 'camera_frame')
+        self.ost_file = rospy.get_param('~ost_file', '/root/precision_ws/src/DroneIfsc/droneifsc/scripts/ost.yaml')  # Path to the camera calibration file
+        
         # Initialize camera capture
         rospy.loginfo("Initializing camera...")
+        self.camera = FlaskCamera("192.168.0.104").start_stream()
         
         # Initialize CvBridge
         self.bridge = CvBridge()
@@ -32,43 +82,27 @@ class CameraHandler:
         # Create and publish camera info (dummy values for demonstration)
         self.camera_info = self.get_camera_info()
         
-        # Initialize VideoCapture
-        rospy.loginfo("Opening shared memory camera stream: %s", self.shm_path)
-        self.cap = cv2.VideoCapture(self.shm_path)
-        if not self.cap.isOpened():
-            rospy.logerr("Failed to open video stream from %s", self.shm_path)
-        
         rospy.loginfo("Camera Handler initialized with topics: %s and %s", self.image_topic, self.camera_info_topic)
-
-        # Main loop
-        rate = rospy.Rate(20)  # 20 Hz
         while not rospy.is_shutdown():
             self.publish_camera_data()
-            rate.sleep()
+            time.sleep(0.033)  # Adjust the sleep time as needed
     def publish_camera_data(self):
-        ret, img = self.cap.read()
-        if not ret or img is None:
-            rospy.logwarn("No frame captured from shared memory stream.")
-            return
-        # aqui você teria algo como sensor_timestamp (ns desde boot)
-        # se o driver te dá esse valor, por ex. self.camera.timestamp
-        # senão, pode usar CLOCK_BOOTTIME direto:
-        sensor_ts_boot = time.clock_gettime(time.CLOCK_BOOTTIME)  
-
-        # converte para tempo de parede (epoch)
-        sensor_ts_epoch = sensor_ts_boot + self.boot_epoch_offset  
-
-        # cria stamp ROS
-        secs = int(sensor_ts_epoch)
-        nsecs = int((sensor_ts_epoch - secs) * 1e9)
-        stamp = rospy.Time(secs, nsecs)
+        # Simulate capturing an image (replace with actual camera capture code)
         try:
-            ros_image = self.bridge.cv2_to_imgmsg(img, encoding="mono8") 
-            ros_image.header.stamp = stamp
+            img = self.camera.frame
+            if img is None:
+                rospy.logwarn("No image captured from camera.")
+                return
+            #rotimg = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+            # Convert OpenCV image to ROS Image message
+            ros_image = self.bridge.cv2_to_imgmsg(img, encoding="bgr8")
+            ros_image.header.stamp = rospy.Time.now()
             ros_image.header.frame_id = self.frame_id
-            # Publish
+            
+            # Publish the image
             self.image_pub.publish(ros_image)
             self.camera_info.header = ros_image.header
+            #Publish the camera info
             self.camera_info_pub.publish(self.camera_info)
 
         except CvBridgeError as e:
@@ -106,8 +140,7 @@ class CameraHandler:
         except yaml.YAMLError as exc:
             print(f"Error parsing YAML: {exc}")
     def __del__(self):
-        if hasattr(self, "cap") and self.cap.isOpened():
-            self.cap.release()
+        self.camera.stop()
         rospy.loginfo("Camera Handler node shutting down.")
 if __name__ == '__main__':
     try:
